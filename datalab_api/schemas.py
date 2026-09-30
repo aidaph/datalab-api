@@ -1,4 +1,5 @@
 from enum import StrEnum
+from typing import Literal
 
 from pydantic import BaseModel, Field, SecretStr
 
@@ -10,6 +11,13 @@ class DeploymentTypeInfo(BaseModel):
     icon: str
     available: bool = Field(
         description="Whether this type can currently be deployed by the API."
+    )
+    hub_username_claim: Literal["login", "email"] | None = Field(
+        default=None,
+        description="User field the hub uses as username; null if not a hub.",
+    )
+    keycloak_only: bool = Field(
+        default=False, description="The hub only accepts Keycloak (SSO) logins."
     )
 
 
@@ -57,6 +65,7 @@ class KafkaCluster(BaseModel):
     ready_replicas: int
     bootstrap_servers: str
     client_username: str = "kafkaclient1"
+    created_by: str | None = None
 
 
 class KafkaCredentials(KafkaCluster):

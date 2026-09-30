@@ -327,4 +327,5 @@ def describe_kafka(kube: KubeClient, settings: Settings) -> KafkaCluster | None:
         ready_replicas=ready,
         bootstrap_servers=bootstrap_servers(settings),
         client_username=CLIENT_USERNAME,
+        created_by=annotations.get(settings.owner_annotation),
     )

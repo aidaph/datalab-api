@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from functools import cache
 from pathlib import Path
+from typing import Literal
 
 MANIFESTS_DIR = Path(__file__).parent / "manifests"
 NAMESPACE_PREFIX = "jupyterhub-"
@@ -25,6 +26,11 @@ class DeploymentTypeSpec:
     icon: str
     # Mount a shared ReadWriteMany volume ("<type>-data-shared") in user pods.
     shared_storage: bool = False
+    # Claim of the DataLab user that the hub uses as its username (must match
+    # the hub's authenticator config). None for types that are not hubs.
+    hub_username_claim: Literal["login", "email"] | None = None
+    # The hub only accepts Keycloak (SSO) logins.
+    keycloak_only: bool = False
 
 
 CATALOG: dict[DeploymentType, DeploymentTypeSpec] = {
@@ -35,6 +41,8 @@ CATALOG: dict[DeploymentType, DeploymentTypeSpec] = {
         ),
         icon="📊",
         shared_storage=True,
+        hub_username_claim="login",  # preferred_username in configmap-ids
+        keycloak_only=True,
     ),
     DeploymentType.climate: DeploymentTypeSpec(
         label="Climate",
@@ -42,6 +50,8 @@ CATALOG: dict[DeploymentType, DeploymentTypeSpec] = {
             "Entorno para análisis de datos climáticos y experimentación científica."
         ),
         icon="🌍",
+        hub_username_claim="email",  # username_claim = "email" in configmap-ipcc
+        keycloak_only=True,
     ),
     DeploymentType.master: DeploymentTypeSpec(
         label="Data Science Hub",
@@ -50,6 +60,8 @@ CATALOG: dict[DeploymentType, DeploymentTypeSpec] = {
             "herramientas y datasets variados."
         ),
         icon="📈",
+        hub_username_claim="login",
+        keycloak_only=True,
     ),
     DeploymentType.dummy: DeploymentTypeSpec(
         label="Dummy",
@@ -57,6 +69,8 @@ CATALOG: dict[DeploymentType, DeploymentTypeSpec] = {
             "Entorno de prueba para validación funcional y despliegues de demostración."
         ),
         icon="🧪",
+        # DummyAuthenticator accepts any name; email keeps existing servers.
+        hub_username_claim="email",
     ),
     DeploymentType.kafka: DeploymentTypeSpec(
         label="Kafka",

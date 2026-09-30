@@ -51,6 +51,7 @@ def create_kafka(
         ready_replicas=0,
         bootstrap_servers=kafka_svc.bootstrap_servers(settings),
         client_username=kafka_svc.CLIENT_USERNAME,
+        created_by=user.sub,
         client_password=password,
     )
 

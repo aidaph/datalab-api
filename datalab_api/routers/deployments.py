@@ -35,6 +35,8 @@ def list_deployment_types() -> list[DeploymentTypeInfo]:
             label=spec.label,
             description=spec.description,
             icon=spec.icon,
+            hub_username_claim=spec.hub_username_claim,
+            keycloak_only=spec.keycloak_only,
             available=(
                 deployment_type is DeploymentType.kafka
                 or jupyterhub_available(deployment_type)

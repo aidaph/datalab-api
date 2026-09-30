@@ -191,3 +191,32 @@ def test_hub_deployment_reads_secrets_and_site_settings(settings) -> None:
     for name in ("CONFIGPROXY_AUTH_TOKEN", "JPY_COOKIE_SECRET", "DATALAB_API_TOKEN"):
         assert env[name]["valueFrom"]["secretKeyRef"]["name"] == envs.HUB_SECRET_NAME
         assert "value" not in env[name]
+
+
+def test_types_tell_the_portal_how_hubs_name_users(app_client: TestClient) -> None:
+    types = {item["type"]: item for item in app_client.get("/deployments/types").json()}
+    assert types["ids"]["hub_username_claim"] == "login"
+    assert types["ipcc"]["hub_username_claim"] == "email"
+    assert types["ids"]["keycloak_only"] and not types["dummy"]["keycloak_only"]
+    assert types["kafka"]["hub_username_claim"] is None
+
+
+def test_catalog_username_claim_matches_hub_config() -> None:
+    import re
+
+    import yaml
+
+    from datalab_api.catalog import CATALOG, hub_configmap_path, jupyterhub_available
+
+    claim_for = {"preferred_username": "login", "email": "email"}
+    for deployment_type, spec in CATALOG.items():
+        if not jupyterhub_available(deployment_type):
+            continue
+        config = yaml.safe_load(hub_configmap_path(deployment_type).read_text())
+        code = config["data"]["jupyterhub_config.py"]
+        match = re.search(r'GenericOAuthenticator\.username_claim = "(\w+)"', code)
+        if match:
+            assert spec.keycloak_only
+            assert spec.hub_username_claim == claim_for[match.group(1)], deployment_type
+        else:
+            assert not spec.keycloak_only, deployment_type

@@ -1,6 +1,7 @@
 from unittest.mock import MagicMock
 
 from fastapi.testclient import TestClient
+from kubernetes.client.rest import ApiException
 
 from datalab_api.config import Settings
 from datalab_api.services import kafka
@@ -52,3 +53,19 @@ def test_create_kafka_validates_input(app_client: TestClient, token_for) -> None
 
 def test_get_kafka_404_when_absent(app_client: TestClient, token_for) -> None:
     assert app_client.get("/deployments/kafka", headers=token_for()).status_code == 404
+
+
+def test_kafka_reports_its_creator(
+    app_client: TestClient, kube: MagicMock, token_for
+) -> None:
+    from .conftest import make_namespace
+
+    created = app_client.post(
+        "/deployments/kafka", json={"replicas": 1}, headers=token_for()
+    )
+    assert created.json()["created_by"] == "github:1"
+
+    kube.get_namespace.return_value = make_namespace("kafka", owner="github:1")
+    kube.apps.read_namespaced_stateful_set_status.side_effect = ApiException(status=404)
+    body = app_client.get("/deployments/kafka", headers=token_for()).json()
+    assert body["created_by"] == "github:1"
