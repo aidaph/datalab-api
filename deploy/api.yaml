@@ -1,0 +1,142 @@
+# DataLab API at https://api.datalab.ifca.es, running with its own ServiceAccount.
+#
+# Settings come from the "datalab-api-env" Secret (see deploy/create-env-secret.sh)
+# and TLS from the *.datalab.ifca.es wildcard in "cert-secret".
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: datalab-api-sa
+  namespace: datalab-api
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: datalab-api
+rules:
+  - apiGroups: [""]
+    resources: [namespaces]
+    verbs: [get, list, create, patch, delete]
+  - apiGroups: [""]
+    resources: [configmaps, secrets, services, serviceaccounts]
+    verbs: [get, create]
+  # The API grants these to each hub's Role, so it must hold them itself.
+  - apiGroups: [""]
+    resources: [pods, persistentvolumeclaims]
+    verbs: [get, watch, list, create, delete]
+  - apiGroups: [""]
+    resources: [events]
+    verbs: [get, watch, list]
+  - apiGroups: [apps]
+    resources: [deployments, deployments/status, statefulsets, statefulsets/status]
+    verbs: [get, create]
+  - apiGroups: [rbac.authorization.k8s.io]
+    resources: [roles, rolebindings]
+    verbs: [get, create]
+  - apiGroups: [networking.k8s.io]
+    resources: [ingresses]
+    verbs: [get, create]
+  # Health of the shared Longhorn volumes.
+  - apiGroups: [longhorn.io]
+    resources: [volumes]
+    verbs: [get]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: datalab-api
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: datalab-api
+subjects:
+  - kind: ServiceAccount
+    name: datalab-api-sa
+    namespace: datalab-api
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: datalab-api
+  namespace: datalab-api
+  labels:
+    app: datalab-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: datalab-api
+  template:
+    metadata:
+      labels:
+        app: datalab-api
+    spec:
+      serviceAccountName: datalab-api-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+      containers:
+        - name: api
+          image: ghcr.io/ifca-datalab/datalab-api:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - secretRef:
+                name: datalab-api-env
+          env:
+            # Trust X-Forwarded-* from ingress-nginx.
+            - name: FORWARDED_ALLOW_IPS
+              value: "*"
+          readinessProbe:
+            httpGet: { path: /readyz, port: 8000 }
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /healthz, port: 8000 }
+            periodSeconds: 30
+          resources:
+            requests: { cpu: 100m, memory: 128Mi }
+            limits: { cpu: "1", memory: 512Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: datalab-api
+  namespace: datalab-api
+spec:
+  selector:
+    app: datalab-api
+  ports:
+    - port: 8000
+      targetPort: 8000
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: datalab-api
+  namespace: datalab-api
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts: [api.datalab.ifca.es]
+      secretName: cert-secret
+  rules:
+    - host: api.datalab.ifca.es
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: datalab-api
+                port:
+                  number: 8000

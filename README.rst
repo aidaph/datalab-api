@@ -129,11 +129,17 @@ Deployment in Kubernetes
 
 .. code-block:: console
 
-    $ kubectl create secret generic datalab-api-env --from-env-file=.env
-    $ kubectl apply -f datalab_api/manifests/api-deployment.yaml
+    $ kubectl apply -f deploy/api.yaml
+    $ deploy/create-env-secret.sh .env
+    $ kubectl -n datalab-api rollout restart deployment/datalab-api
+
+``create-env-secret.sh`` takes a local ``.env`` and replaces the portal and
+callback URLs with the public ones (``https://api.datalab.ifca.es``,
+``https://portal.datalab.ifca.es``). TLS uses the wildcard ``cert-secret`` of
+the ``datalab-api`` namespace.
 
 The container image is built and published to the GitHub Container Registry by
-the workflow in ``.github/workflows``.
+the workflow in ``.github/workflows``: ``:latest`` follows ``master``.
 
 Development
 -----------
