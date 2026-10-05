@@ -27,6 +27,7 @@ from ..k8s import (
     create_if_absent,
 )
 from ..schemas import Environment, EnvironmentStatus
+from .volumes import describe_shared_volume, shared_volume_name
 
 log = logging.getLogger(__name__)
 
@@ -107,7 +108,7 @@ def build_shared_pvc(
     settings: Settings, deployment_type: DeploymentType
 ) -> client.V1PersistentVolumeClaim:
     return client.V1PersistentVolumeClaim(
-        metadata=client.V1ObjectMeta(name=f"{deployment_type}-data-shared"),
+        metadata=client.V1ObjectMeta(name=shared_volume_name(deployment_type)),
         spec=client.V1PersistentVolumeClaimSpec(
             access_modes=["ReadWriteMany"],
             resources=client.V1VolumeResourceRequirements(
@@ -301,6 +302,16 @@ def describe_environment(
     else:
         status = EnvironmentStatus.provisioning
 
+    try:
+        spec = CATALOG.get(DeploymentType(deployment_type))
+    except ValueError:  # a namespace that is not in the catalog
+        spec = None
+    shared_volume = (
+        describe_shared_volume(kube, settings, name, deployment_type)
+        if spec and spec.shared_storage and status is not EnvironmentStatus.deleting
+        else None
+    )
+
     return Environment(
         type=deployment_type,
         namespace=name,
@@ -308,6 +319,7 @@ def describe_environment(
         hub_url=hub_url(settings, deployment_type),
         created_by=annotations.get(settings.owner_annotation),
         error=error,
+        shared_volume=shared_volume,
     )
 
 

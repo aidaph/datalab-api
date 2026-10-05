@@ -28,6 +28,24 @@ class EnvironmentStatus(StrEnum):
     deleting = "deleting"
 
 
+class SharedVolume(BaseModel):
+    """The volume with the data shared by everyone in an environment."""
+
+    name: str
+    created: bool = Field(description="Whether the PersistentVolumeClaim exists")
+    on_longhorn: bool = Field(description="Provisioned by Longhorn")
+    ready: bool = Field(description="Bound and usable (Longhorn: not faulted)")
+    storage_class: str | None = None
+    size: str | None = Field(default=None, description="Capacity, e.g. 100Gi")
+    used_bytes: int | None = Field(
+        default=None, description="Space used on disk (Longhorn only)"
+    )
+    status: str | None = Field(
+        default=None,
+        description="Longhorn state/robustness, or the PVC phase otherwise",
+    )
+
+
 class Environment(BaseModel):
     type: str
     namespace: str
@@ -35,6 +53,9 @@ class Environment(BaseModel):
     hub_url: str
     created_by: str | None = None
     error: str | None = None
+    shared_volume: SharedVolume | None = Field(
+        default=None, description="Only for types with shared storage"
+    )
 
 
 class ServerStatus(StrEnum):

@@ -5,6 +5,7 @@ import httpx
 import pytest
 from fastapi.testclient import TestClient
 from kubernetes import client
+from kubernetes.client.rest import ApiException
 
 from datalab_api.config import Settings
 from datalab_api.main import create_app
@@ -37,6 +38,11 @@ def kube() -> MagicMock:
     fake = MagicMock()
     fake.get_namespace.return_value = None
     fake.core.list_namespace.return_value = client.V1NamespaceList(items=[])
+    # By default nothing else exists; tests opt in to PVCs and Longhorn volumes.
+    fake.core.read_namespaced_persistent_volume_claim.side_effect = ApiException(
+        status=404
+    )
+    fake.custom.get_namespaced_custom_object.side_effect = ApiException(status=404)
     return fake
 
 

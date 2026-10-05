@@ -122,3 +122,19 @@ def test_empty_env_vars_leave_integrations_disabled(monkeypatch) -> None:
     assert not loaded.keycloak_enabled
     assert loaded.admin_users == ["ana", "root@x.es"]
     assert loaded.hub_oauth_client_secrets["ids"].get_secret_value() == "s"
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("true", True),
+        ("False", False),
+        ("0", False),
+        ("/etc/ssl/ca.pem", "/etc/ssl/ca.pem"),
+    ],
+)
+def test_keycloak_verify_tls_parses_booleans(monkeypatch, raw, expected) -> None:
+    # "false" must disable verification, not be taken as a CA bundle path.
+    monkeypatch.setenv("JWT_SECRET", "y" * 40)
+    monkeypatch.setenv("KEYCLOAK_VERIFY_TLS", raw)
+    assert Settings(_env_file=None).keycloak_verify_tls == expected

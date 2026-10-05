@@ -26,6 +26,7 @@ class KubeClient:
         self.apps = client.AppsV1Api(api_client)
         self.rbac = client.RbacAuthorizationV1Api(api_client)
         self.networking = client.NetworkingV1Api(api_client)
+        self.custom = client.CustomObjectsApi(api_client)
 
     @classmethod
     def from_environment(cls) -> "KubeClient":

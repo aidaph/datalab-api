@@ -70,6 +70,8 @@ class Settings(BaseSettings):
     hub_dummy_password: SecretStr | None = None
     shared_storage_class: str = "longhorn"
     shared_storage_size: str = "100Gi"
+    # Where Longhorn keeps its Volume objects (used for volume health).
+    longhorn_namespace: str = "longhorn-system"
 
     # --- Kafka ---------------------------------------------------------------
     kafka_namespace: str = "kafka"
@@ -84,6 +86,19 @@ class Settings(BaseSettings):
     def _split_csv(cls, value: object) -> object:
         if isinstance(value, str):
             return [item.strip() for item in value.split(",") if item.strip()]
+        return value
+
+    @field_validator("keycloak_verify_tls", mode="before")
+    @classmethod
+    def _parse_verify_tls(cls, value: object) -> object:
+        # With `bool | str`, pydantic would keep "true"/"false" as a str,
+        # which httpx then treats as the path to a CA bundle.
+        if isinstance(value, str):
+            lowered = value.strip().lower()
+            if lowered in {"1", "true", "yes", "on"}:
+                return True
+            if lowered in {"0", "false", "no", "off"}:
+                return False
         return value
 
     @property
